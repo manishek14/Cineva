@@ -14,6 +14,7 @@ import { ReservationModule } from './reservation';
 import { PaymentModule } from './payment';
 import { TicketModule } from './ticket';
 import { CancellationModule } from './cancellation';
+import { JobsModule } from './jobs';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { CancellationModule } from './cancellation';
     PaymentModule,
     TicketModule,
     CancellationModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [],
