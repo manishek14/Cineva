@@ -1,4 +1,5 @@
-// Empty shim - replaced by Jest moduleNameMapper for @nestjs/typeorm,
-// @nestjs/jwt, @nestjs/passport, @nestjs/swagger, @nestjs/bullmq,
-// @nestjs/core in pure unit tests that don't need them.
+// CommonJS shim for @nestjs/typeorm - provides InjectRepository decorator.
+export function InjectRepository(_entity: unknown): ParameterDecorator {
+  return function () {} as ParameterDecorator;
+}
 export {};
