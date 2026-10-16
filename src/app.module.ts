@@ -8,6 +8,7 @@ import { validate } from './config/env.validation';
 import { RedisModule } from './common/redis';
 import { CatalogModule } from './catalog';
 import { HallModule } from './hall';
+import { ScreeningModule } from './screening';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { HallModule } from './hall';
     RedisModule.forRoot(),
     CatalogModule,
     HallModule,
+    ScreeningModule,
   ],
   controllers: [AppController],
   providers: [],
