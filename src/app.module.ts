@@ -11,6 +11,7 @@ import { HallModule } from './hall';
 import { ScreeningModule } from './screening';
 import { AuthModule } from './auth';
 import { ReservationModule } from './reservation';
+import { PaymentModule } from './payment';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { ReservationModule } from './reservation';
     ScreeningModule,
     AuthModule,
     ReservationModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [],
