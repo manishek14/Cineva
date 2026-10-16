@@ -1,0 +1,98 @@
+# Cineva local development compose file.
+#
+# Brings up PostgreSQL 16, Redis 7, pgAdmin, and the BullMQ Board
+# so the NestJS app can run on the host via `npm run start:dev`.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose ps
+#   docker compose logs -f postgres redis
+#   docker compose down -v   # destroy volumes
+
+name: cineva-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cineva-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-cineva}
+      POSTGRES_USER: ${DATABASE_USER:-cineva}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-cineva_secret}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-cineva} -d ${DATABASE_NAME:-cineva}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cineva-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: cineva-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cineva-net
+
+  pgadmin:
+    image: dpage/pgadmin4:8.14
+    container_name: cineva-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@cineva.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cineva-net
+
+  bullboard:
+    # BullMQ admin dashboard (read-only-ish viewer of queues).
+    image: deadly0/bull-board:5
+    container_name: cineva-bullboard
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      BULL_PREFIX: ${BULLMQ_PREFIX:-cineva}
+    ports:
+      - "5051:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - cineva-net
+
+volumes:
+  postgres-data:
+  redis-data:
+  pgadmin-data:
+
+networks:
+  cineva-net:
+    driver: bridge
