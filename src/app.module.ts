@@ -10,6 +10,7 @@ import { CatalogModule } from './catalog';
 import { HallModule } from './hall';
 import { ScreeningModule } from './screening';
 import { AuthModule } from './auth';
+import { ReservationModule } from './reservation';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { AuthModule } from './auth';
     HallModule,
     ScreeningModule,
     AuthModule,
+    ReservationModule,
   ],
   controllers: [AppController],
   providers: [],
