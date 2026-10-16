@@ -12,6 +12,7 @@ import { ScreeningModule } from './screening';
 import { AuthModule } from './auth';
 import { ReservationModule } from './reservation';
 import { PaymentModule } from './payment';
+import { TicketModule } from './ticket';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { PaymentModule } from './payment';
     AuthModule,
     ReservationModule,
     PaymentModule,
+    TicketModule,
   ],
   controllers: [AppController],
   providers: [],
