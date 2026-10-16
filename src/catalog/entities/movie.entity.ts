@@ -23,7 +23,9 @@ export type AgeRating =
  */
 @Entity({ name: 'movies' })
 @Index('idx_movies_status', ['status'])
-@Index('idx_movies_title_trgm', { synchronize: false }) // pg_trgm - migration-defined
+// The pg_trgm index for fuzzy title search is created by migration
+// in production (SQLite doesn't support it; the integration test
+// suite runs without it).
 @Check(`"duration_minutes" > 0`)
 export class MovieEntity extends BaseEntity {
   @Column({ name: 'title', type: 'varchar', length: 200, nullable: false })

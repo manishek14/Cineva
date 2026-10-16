@@ -12,7 +12,7 @@ export type SeatCategoryStatus = 'Active' | 'Archived';
  * Stored prices win; multiplier changes do not retro-edit existing sales.
  */
 @Entity({ name: 'seat_categories' })
-@Index('idx_seat_categories_code', { unique: true })
+@Index('idx_seat_categories_code', ['code'], { unique: true })
 @Index('idx_seat_categories_status', ['status'])
 @Check(`"base_price_multiplier" > 0`)
 export class SeatCategoryEntity extends BaseEntity {
