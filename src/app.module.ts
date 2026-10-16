@@ -9,6 +9,7 @@ import { RedisModule } from './common/redis';
 import { CatalogModule } from './catalog';
 import { HallModule } from './hall';
 import { ScreeningModule } from './screening';
+import { AuthModule } from './auth';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { ScreeningModule } from './screening';
     CatalogModule,
     HallModule,
     ScreeningModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [],
