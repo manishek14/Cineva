@@ -1,0 +1,39 @@
+# Local development overrides - extends docker-compose.yml.
+# Brings up the NestJS app itself in watch mode + postgres + redis.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# (or set COMPOSE_FILE env)
+services:
+  app:
+    build:
+      context: .
+      target: builder
+    image: cineva-app:dev
+    container_name: cineva-app
+    working_dir: /app
+    command: ["npm", "run", "start:dev"]
+    environment:
+      NODE_ENV: development
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: cineva
+      DATABASE_PASSWORD: cineva_secret
+      DATABASE_NAME: cineva
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      DATABASE_SYNC: "true" # only in dev - creates schema without migrations
+      DATABASE_LOGGING: "true"
+      OTP_DEV_PRINT_TO_LOG: "true"
+      PAYMENT_PROVIDER: mock
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cineva-net
