@@ -5,6 +5,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { configuration } from './config/configuration';
 import { validate } from './config/env.validation';
+import { RedisModule } from './common/redis';
 
 @Module({
   imports: [
@@ -54,6 +55,8 @@ import { validate } from './config/env.validation';
         };
       },
     }),
+    // Default Redis client (ioredis). Tests can swap via RedisModule.forRoot({useMock:true}).
+    RedisModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [],
