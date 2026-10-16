@@ -7,6 +7,7 @@ import { configuration } from './config/configuration';
 import { validate } from './config/env.validation';
 import { RedisModule } from './common/redis';
 import { CatalogModule } from './catalog';
+import { HallModule } from './hall';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { CatalogModule } from './catalog';
     // Default Redis client (ioredis). Tests can swap via RedisModule.forRoot({useMock:true}).
     RedisModule.forRoot(),
     CatalogModule,
+    HallModule,
   ],
   controllers: [AppController],
   providers: [],
