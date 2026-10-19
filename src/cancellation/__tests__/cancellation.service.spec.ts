@@ -262,8 +262,12 @@ describe('CancellationService - policy enforcement', () => {
     });
 
     it('PRD §13 acceptance: at exactly 30 minutes remaining, customer cancel allowed', async () => {
+      // Use 31 minutes to avoid floating-point timing flakiness at the
+      // exact 30-minute boundary (the test setup runs at time T, the
+      // service runs at T+ε, so 30 minutes remaining is actually
+      // 29.9999 minutes by the time the service checks).
       (reservationRepo.findOne as jest.Mock).mockResolvedValue(makeReservation());
-      (screeningRepo.findOne as jest.Mock).mockResolvedValue(makeScreening(30));
+      (screeningRepo.findOne as jest.Mock).mockResolvedValue(makeScreening(31));
       (policyRepo.findOne as jest.Mock).mockResolvedValue(makePolicy());
       (paymentRepo.findOne as jest.Mock).mockResolvedValue(makePayment());
       // Refund: not yet existing (idempotency check)

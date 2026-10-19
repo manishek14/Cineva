@@ -17,6 +17,7 @@ import {
 } from '../dtos/screening.dto';
 import { BusinessError } from '../../common/utils';
 import { ERROR_CODES } from '../../common/constants/error-codes';
+import { RealtimeService } from '../../realtime/services/realtime.service';
 
 @Injectable()
 export class ScreeningService {
@@ -36,6 +37,7 @@ export class ScreeningService {
     @InjectRepository(SeatCategoryEntity)
     private readonly categoryRepo: Repository<SeatCategoryEntity>,
     private readonly dataSource: DataSource,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
@@ -237,10 +239,29 @@ export class ScreeningService {
 
     // Bulk-block all not-yet-sold screening seats so customers can't start
     // new reservations while refunds are processed.
+    const blockedSeats = await this.seatRepo.find({
+      where: { screeningId: id, saleStatus: 'Available' as ScreeningSeatStatus },
+      select: ['id'],
+    });
     await this.seatRepo.update(
       { screeningId: id, saleStatus: 'Available' as ScreeningSeatStatus },
       { saleStatus: 'Blocked' as ScreeningSeatStatus, blockReason: 'Screening cancelled' },
     );
+
+    // Publish real-time events so connected clients see the screening
+    // disappear and all Available seats flip to Blocked.
+    await this.realtime.publishScreeningCancelled({
+      screeningId: id,
+      reason: dto.reason,
+    });
+    if (blockedSeats.length > 0) {
+      await this.realtime.publishSeatBlocked({
+        screeningId: id,
+        seatIds: blockedSeats.map((s) => s.id),
+        reason: 'Screening cancelled',
+      });
+    }
+
     return ScreeningResponseDto.from(saved);
   }
 

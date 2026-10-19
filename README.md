@@ -372,6 +372,105 @@ npm run test:cov    # coverage report
 
 ---
 
+## WebSocket برای real-time seat status
+
+Cineva یک WebSocket gateway روی namespace `/realtime` ارائه می‌دهد. وقتی مشتریان نقشه‌ی صندلی یک سانس را باز می‌کنند، می‌توانند به gateway وصل شوند و در لحظه تغییرات را ببینند (بدون نیاز به polling REST endpoint).
+
+### معماری
+
+```text
+User A holds seat 1 ─┐
+                      ▼
+            ReservationService
+                      │
+                      ▼ publish to Redis pub/sub
+            cineva:events:screening:{id}
+                      │
+                      ▼
+            RedisSubscriber (dedicated ioredis connection)
+                      │
+                      ▼ via EventEmitter2('realtime:message')
+            SeatStatusGateway
+                      │
+                      ▼ socket.io room: screening:{id}
+            All connected clients (User B, C, D ...)
+```
+
+**چرا Redis pub/sub به‌جای emit مستقیم؟** وقتی چندین instance از NestJS اجرا می‌شود (load balancer)، مشتری متصل به instance B باید وقتی رخدادی در instance A رخ می‌دهد آن را ببیند. فقط Redis pub/sub می‌تواند بین instances پل بزند.
+
+### اتصال از سمت کلاینت (JavaScript/TypeScript)
+
+```typescript
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000/realtime', {
+  transports: ['websocket'],
+});
+
+// وقتی نقشه‌ی صندلی سانس را باز می‌کنی:
+socket.emit('subscribe', { screeningId: 'the-screening-id' });
+
+// گوش دادن به رویدادها:
+socket.on('seat:held', (payload) => {
+  // payload: { screeningId, seatIds: [...], status: 'Held', reservationId, reason, occurredAt }
+  // این صندلی‌ها را در UI به‌عنوان "در حال رزرو" نمایش بده
+});
+
+socket.on('seat:sold', (payload) => {
+  // payload: { screeningId, seatIds: [...], status: 'Sold', reservationId, ... }
+  // این صندلی‌ها را به‌عنوان "فروخته‌شده" علامت‌گذاری کن
+});
+
+socket.on('seat:available', (payload) => {
+  // این صندلی‌ها دوباره قابل انتخاب هستند (انقضای TTL یا لغو)
+});
+
+socket.on('seat:blocked', (payload) => {
+  // این صندلی‌ها از سمت مدیر مسدود شده‌اند
+});
+
+socket.on('screening:cancelled', (payload) => {
+  // کل سانس لغو شد - کاربر را به صفحه‌ی اصلی برگردان
+});
+
+socket.on('reservation:confirmed', (payload) => { /* ... */ });
+socket.on('reservation:expired', (payload) => { /* ... */ });
+socket.on('reservation:cancelled', (payload) => { /* ... */ });
+
+// وقتی کاربر از صفحه بیرون می‌رود:
+socket.emit('unsubscribe', { screeningId: 'the-screening-id' });
+socket.disconnect();
+```
+
+### رویدادها و payloadها
+
+| رویداد | payload شامل | چه زمانی |
+| --- | --- | --- |
+| `seat:held` | screeningId, seatIds, status='Held', reservationId, occurredAt | رزرو موقت ساخته شد |
+| `seat:released` | screeningId, seatIds, status='Released', reason, occurredAt | رزرو لغو شد یا منقضی شد |
+| `seat:available` | همان `seat:released` | (همراه `seat:released` برای کاربردهای متفاوت UI) |
+| `seat:sold` | screeningId, seatIds, status='Sold', reservationId, occurredAt | پرداخت موفق → رزرو نهایی شد |
+| `seat:blocked` | screeningId, seatIds, status='Blocked', reason, occurredAt | مدیر یا لغو سانس → صندلی مسدود شد |
+| `screening:cancelled` | screeningId, reason, occurredAt | سانس توسط مدیر/اپراتور لغو شد |
+| `reservation:confirmed` | reservationId, customerId, screeningId, status='Confirmed', occurredAt | رزرو Confirmed شد |
+| `reservation:expired` | reservationId, customerId, screeningId, status='Expired', occurredAt | TTL منقضی شد |
+| `reservation:cancelled` | reservationId, customerId, screeningId, status='Cancelled', occurredAt | مشتری لغو کرد |
+
+### کانال‌های Redis Pub/Sub
+
+- `cineva:events:screening:{screeningId}` - همه‌ی رویدادهای یک سانس
+- `cineva:events:reservation:{reservationId}` - همه‌ی رویدادهای یک رزرو
+
+Subscriber از `psubscribe` با pattern matching استفاده می‌کند تا نیازی به subscribe مجدد برای سانس‌های جدید نباشد.
+
+### رزلیانس
+
+- اگر Redis در دسترس باشد، publish به‌صورت fire-and-forget انجام می‌شود. رویداد از دست می‌رود ولی state واقعی در PostgreSQL درست است.
+- اگر WebSocket connection قطع شود، کلاینت باید reconnect کند. اطلاعاتی از دست نمی‌رود چون state همیشه از REST `/screenings/:id/seat-map` قابل fetch است.
+- برای رویدادهای critical که نباید گم شوند (مثل webhookهای مالی)، از Transactional Outbox (AuditModule) استفاده می‌شود - نه از RealtimeService.
+
+---
+
 ## مجوز
 
 MIT

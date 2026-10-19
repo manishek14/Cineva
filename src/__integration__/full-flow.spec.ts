@@ -12,6 +12,7 @@ import { CancellationService } from 'src/cancellation/services/cancellation.serv
 import { AuthService } from 'src/auth/services/auth.service';
 import { OtpService } from 'src/auth/services/otp.service';
 import { RedisService } from 'src/common/redis/redis.service';
+import { RealtimeService } from 'src/realtime/services/realtime.service';
 import { MockPaymentProvider } from 'src/payment/providers/mock-payment.provider';
 import { PAYMENT_PROVIDER_TOKEN } from 'src/payment/providers/payment-provider.port';
 import type { DataSource } from 'typeorm';
@@ -72,6 +73,11 @@ describe('Integration: full customer flow (no HTTP layer)', () => {
 
     const redisService = new RedisService(redis, config);
 
+    // RealtimeService - publishes to Redis pub/sub. Uses the same
+    // ioredis-mock as everything else; in production it would be a
+    // dedicated connection.
+    const realtimeService = new RealtimeService(redis);
+
     // Repositories.
     const movieRepo = dataSource.getRepository(MovieService.prototype.constructor as never) as never;
     // TypeORM getRepository takes the entity class, not a service.
@@ -123,6 +129,7 @@ describe('Integration: full customer flow (no HTTP layer)', () => {
       dataSource.getRepository(seatEntity) as never,
       dataSource.getRepository(categoryEntity) as never,
       dataSource,
+      realtimeService,
     );
 
     // OTP service depends on challenge repo + user repo + config + redis.
@@ -149,6 +156,7 @@ describe('Integration: full customer flow (no HTTP layer)', () => {
       dataSource,
       redisService,
       config,
+      realtimeService,
     );
 
     const mockProvider = new MockPaymentProvider(config);

@@ -100,6 +100,16 @@ describe('ReservationService - PRD §13 acceptance (no Postgres required)', () =
       ds as unknown as DataSource,
       redis,
       config,
+      {
+        publishSeatHeld: jest.fn(async () => undefined),
+        publishSeatReleased: jest.fn(async () => undefined),
+        publishSeatSold: jest.fn(async () => undefined),
+        publishSeatBlocked: jest.fn(async () => undefined),
+        publishScreeningCancelled: jest.fn(async () => undefined),
+        publishReservationConfirmed: jest.fn(async () => undefined),
+        publishReservationExpired: jest.fn(async () => undefined),
+        publishReservationCancelled: jest.fn(async () => undefined),
+      } as never,
     );
   });
 

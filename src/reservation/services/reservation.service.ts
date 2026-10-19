@@ -15,6 +15,7 @@ import { BusinessError } from '../../common/utils';
 import { ERROR_CODES } from '../../common/constants/error-codes';
 import { canTransition, RESERVATION_TRANSITIONS } from '../../common/constants/state-machine';
 import { REDIS_KEYS } from '../../common/redis/redis.constants';
+import { RealtimeService } from '../../realtime/services/realtime.service';
 
 /**
  * ReservationService is the heart of Cineva. It implements the
@@ -58,6 +59,7 @@ export class ReservationService {
     private readonly dataSource: DataSource,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {
     this.holdTtlSeconds = Number(this.config.get('RESERVATION_HOLD_TTL_MINUTES', 10)) * 60;
     this.holderTokenPrefix = this.config.get<string>('RESERVATION_HOLDER_TOKEN_PREFIX', 'res:');
@@ -217,6 +219,16 @@ export class ReservationService {
 
         createdReservation = reservation;
         createdResSeats = resSeats;
+      });
+
+      // Publish real-time event: seats now Held. Other customers with
+      // the seat map open will see the seats disappear from "Available"
+      // immediately (no need to poll the REST endpoint).
+      await this.realtime.publishSeatHeld({
+        screeningId: screening.id,
+        seatIds,
+        reservationId,
+        reason: 'reservation_created',
       });
     } catch (err) {
       // Rollback Redis holds we acquired (with ownership check).
@@ -556,6 +568,21 @@ export class ReservationService {
         screeningId: reservation.screeningId,
       });
 
+      // Publish real-time events (outside the tx - they're UI updates,
+      // not business state). Other customers see the seats disappear
+      // from "Available" / "Held" and turn to "Sold".
+      await this.realtime.publishSeatSold({
+        screeningId: reservation.screeningId,
+        seatIds,
+        reservationId: reservation.id,
+        reason: 'payment_confirmed',
+      });
+      await this.realtime.publishReservationConfirmed({
+        reservationId: reservation.id,
+        customerId: reservation.customerId,
+        screeningId: reservation.screeningId,
+      });
+
       return reservation;
     });
   }
@@ -617,6 +644,33 @@ export class ReservationService {
       ownerToken: reservation.ownerToken ?? '',
       screeningId: reservation.screeningId,
     });
+
+    // Publish real-time events: seats back to Available. Other
+    // customers see them re-appear in the seat map immediately.
+    const releasedSeatIds = (reservation.seats ?? []).map((s) => s.screeningSeatId);
+    if (releasedSeatIds.length > 0) {
+      await this.realtime.publishSeatReleased({
+        screeningId: reservation.screeningId,
+        seatIds: releasedSeatIds,
+        reservationId: reservation.id,
+        reason,
+      });
+    }
+
+    // Publish the corresponding reservation status event (Cancelled vs Expired).
+    if (newStatus === 'Cancelled') {
+      await this.realtime.publishReservationCancelled({
+        reservationId: reservation.id,
+        customerId: reservation.customerId,
+        screeningId: reservation.screeningId,
+      });
+    } else if (newStatus === 'Expired') {
+      await this.realtime.publishReservationExpired({
+        reservationId: reservation.id,
+        customerId: reservation.customerId,
+        screeningId: reservation.screeningId,
+      });
+    }
 
     const fresh = await this.reservationRepo.findOne({
       where: { id: reservation.id },
